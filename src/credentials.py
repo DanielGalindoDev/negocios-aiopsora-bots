@@ -1,6 +1,6 @@
 import httpx
 from fastapi import HTTPException
-from src.config import settings
+from config import settings
 
 async def get_or_create_credential(name: str, cred_type: str, data: dict) -> str:
     """
