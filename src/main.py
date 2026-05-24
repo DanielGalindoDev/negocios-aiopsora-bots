@@ -7,11 +7,11 @@ from fastapi import FastAPI, HTTPException, Depends
 from sqlmodel import SQLModel, Session, create_engine
 
 # Import modular config, models, and workflows
-from config import settings
-from models import Deployment, DeployRequest, DeployResponse, UpdatePromptRequest
-from credentials import get_or_create_credential, get_or_create_openai_credential
-from admin_workflow import get_admin_workflow
-from user_workflow import get_user_workflow
+from src.config import settings
+from src.models import Deployment, DeployRequest, DeployResponse, UpdatePromptRequest
+from src.credentials import get_or_create_credential, get_or_create_openai_credential
+from src.admin_workflow import get_admin_workflow
+from src.user_workflow import get_user_workflow
 
 # --- CONFIGURACIÓN DE BASE DE DATOS LOCAL ---
 engine = create_engine(settings.DATABASE_URL)
