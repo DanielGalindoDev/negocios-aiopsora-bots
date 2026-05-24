@@ -19,7 +19,7 @@ function App() {
 
   // Edit Prompt State (Modal)
   const [editingBotId, setEditingBotId] = useState(null)
-  const [editConfig, setEditConfig] = useState({ name: '', role: '', tone: 'Formal y profesional' })
+  const [editConfig, setEditConfig] = useState({ name: '', role: '', tone: 'Formal y profesional', strictness: 'strict' })
   const [isUpdating, setIsUpdating] = useState(false)
 
   // Create Bot State
@@ -32,22 +32,25 @@ function App() {
   const [botConfig, setBotConfig] = useState({
     name: '',
     role: '',
-    tone: 'Formal y profesional'
+    tone: 'Formal y profesional',
+    strictness: 'strict'
   })
+  const [showDirectivesModal, setShowDirectivesModal] = useState(false)
   const [isDeploying, setIsDeploying] = useState(false)
   const [deploySuccess, setDeploySuccess] = useState(false)
 
   // -- HANDLERS --
+  
+  const handleNextStep = (e) => {
+    e.preventDefault()
+    setShowDirectivesModal(true)
+  }
 
   const handleLogin = (e) => {
     e.preventDefault()
-    if (username === 'admin' && password === 'admin') {
-      setIsAuthenticated(true)
-      setCurrentView('dashboard')
-      setLoginError('')
-    } else {
-      setLoginError('Credenciales incorrectas (usa admin/admin)')
-    }
+    setIsAuthenticated(true)
+    setCurrentView('dashboard')
+    setLoginError('')
   }
 
   const handleRegister = (e) => {
@@ -94,17 +97,30 @@ function App() {
     }
   }
 
+  const generatePromptWithRules = (config) => {
+    let rules = ''
+    if (config.strictness === 'strict') {
+      rules = '=== NIVEL DE RESTRICCIÓN RAG: ESTRICTO ===\\nBajo ninguna circunstancia inventes información. Si el contexto proporcionado no contiene la respuesta exacta o está vacío, debes decir exactamente: "Lo siento, no pude encontrar esa información. ¿Podrías especificar o reformular tu pregunta?"'
+    } else if (config.strictness === 'flexible') {
+      rules = '=== NIVEL DE RESTRICCIÓN RAG: FLEXIBLE ===\\nPrioriza la información del contexto. Si el contexto no tiene la respuesta exacta, puedes hacer inferencias lógicas o dar consejos generales relacionados, pero siempre aclara amablemente que es una sugerencia general no incluida en el manual.'
+    } else {
+      rules = '=== NIVEL DE RESTRICCIÓN RAG: CREATIVO ===\\nPuedes usar libremente tu conocimiento general de IA para responder de forma creativa y amigable si el contexto de la base de datos no es suficiente para contestar la pregunta del usuario.'
+    }
+
+    return `Eres un asistente llamado ${config.name || 'Asistente IA'}. Tu rol principal en la empresa es: ${config.role || 'Ayudar con tareas operativas'}. Debes comunicarte SIEMPRE con el siguiente tono: ${config.tone}.\\n\\n${rules}`
+  }
+
   const handleUpdatePrompt = async (e) => {
     e.preventDefault()
     setIsUpdating(true)
     
-    const generatedPrompt = `Eres un asistente llamado ${editConfig.name || 'Asistente IA'}. Tu rol principal en la empresa es: ${editConfig.role || 'Ayudar con tareas operativas'}. Debes comunicarte SIEMPRE con el siguiente tono: ${editConfig.tone}.`
+    const newPrompt = generatePromptWithRules(editConfig)
     
     try {
       const res = await fetch(`${API_URL}/deploy/${editingBotId}/prompt`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extra_prompt: generatedPrompt })
+        body: JSON.stringify({ extra_prompt: newPrompt })
       })
       
       if (res.ok) {
@@ -124,11 +140,11 @@ function App() {
     e.preventDefault()
     setIsDeploying(true)
     
-    const generatedPrompt = `Eres un asistente llamado ${botConfig.name || 'Asistente IA'}. Tu rol principal en la empresa es: ${botConfig.role || 'Ayudar con tareas operativas'}. Debes comunicarte SIEMPRE con el siguiente tono: ${botConfig.tone}.`
+    const newPrompt = generatePromptWithRules(botConfig)
     
     const payload = {
       ...formData,
-      extra_prompt: generatedPrompt
+      extra_prompt: newPrompt
     }
 
     try {
@@ -144,9 +160,10 @@ function App() {
         setDeploySuccess(true)
         setTimeout(() => {
           setDeploySuccess(false)
+          setShowDirectivesModal(false)
           setCurrentView('dashboard')
           setFormData({ admin_token: '', user_token: '', openai_api_key: '' })
-          setBotConfig({ name: '', role: '', tone: 'Formal y profesional' })
+          setBotConfig({ name: '', role: '', tone: 'Formal y profesional', strictness: 'strict' })
         }, 2000)
       } else {
         alert("Error de despliegue. Verifique tokens.")
@@ -170,7 +187,7 @@ function App() {
   const renderHome = () => (
     <div>
       <div className="landing-nav">
-        <button className="btn btn-outline" style={{width: 'auto', padding: '0.5rem 1.5rem'}} onClick={() => setCurrentView('login')}>Iniciar Sesión</button>
+        <span className="link" onClick={() => setCurrentView('login')} style={{fontSize: '0.9rem', fontWeight: 500}}>Iniciar Sesión</span>
       </div>
 
       <div className="landing-hero">
@@ -182,7 +199,7 @@ function App() {
           Soluciones cognitivas diseñadas para optimizar y automatizar la estructura operativa de su organización, garantizando un despliegue seguro, privado y altamente escalable.
         </p>
 
-        <button className="btn" style={{width: 'auto', padding: '1rem 3rem'}} onClick={() => setCurrentView('login')}>
+        <button className="btn" style={{width: 'auto', padding: '1rem 3rem', border: 'none'}} onClick={() => setCurrentView('login')}>
           Ingresar al Portal
         </button>
 
@@ -230,7 +247,7 @@ function App() {
 
   const renderRegister = () => (
     <div style={{minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: '450px' }}>
+      <div className="glass-card" style={{ width: '100%', maxWidth: '450px', border: 'none', background: 'transparent', padding: '0' }}>
         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '2rem'}}>
           <h2>Registro</h2>
           <span className="link" onClick={() => setCurrentView('home')}>Volver</span>
@@ -249,7 +266,7 @@ function App() {
             <label>Clave de Acceso</label>
             <input required type="password" placeholder="••••••••" />
           </div>
-          <button type="submit" className="btn" style={{marginTop: '2rem'}}>Provisionar Instancia</button>
+          <button type="submit" className="btn" style={{marginTop: '2rem', border: 'none'}}>Provisionar Instancia</button>
         </form>
         
         <p style={{textAlign: 'center', marginTop: '2rem', fontSize: '0.85rem'}}>
@@ -261,31 +278,21 @@ function App() {
 
   const renderLogin = () => (
     <div style={{minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-      <div className="glass-card" style={{ width: '100%', maxWidth: '400px' }}>
+      <div className="glass-card" style={{ width: '100%', maxWidth: '400px', border: 'none', background: 'transparent', padding: '0' }}>
         <h2>Autenticación</h2>
         <p style={{marginBottom: '2rem'}}>Acceso seguro al panel de control.</p>
       
       <form onSubmit={handleLogin} style={{textAlign: 'left'}}>
         <div className="input-group">
-          <label>Identificador de Usuario</label>
-          <input 
-            type="text" 
-            placeholder="admin" 
-            value={username} 
-            onChange={e => setUsername(e.target.value)} 
-          />
+          <label>Email Administrador</label>
+          <input required type="email" placeholder="admin@empresa.com" value={username} onChange={e => setUsername(e.target.value)} />
         </div>
         <div className="input-group">
-          <label>Credencial de Acceso</label>
-          <input 
-            type="password" 
-            placeholder="••••••••" 
-            value={password} 
-            onChange={e => setPassword(e.target.value)} 
-          />
+          <label>Clave de Acceso</label>
+          <input required type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
         </div>
         {loginError && <p style={{color: 'var(--text-primary)', marginTop: '1rem', fontSize: '0.85rem'}}>{loginError}</p>}
-        <button type="submit" className="btn" style={{marginTop: '2rem'}}>Ingresar</button>
+        <button type="submit" className="btn" style={{marginTop: '2rem', border: 'none'}}>Ingresar</button>
       </form>
       <div style={{marginTop: '2rem', textAlign: 'center'}}>
         <p style={{fontSize: '0.85rem', marginBottom: '1rem'}}>
@@ -298,74 +305,100 @@ function App() {
   )
 
   const renderDashboard = () => (
-    <div>
-      <div className="nav-bar">
-        <h2>Panel de Orquestación</h2>
-        <div style={{display: 'flex', gap: '1.5rem', alignItems: 'center'}}>
-          <button className="btn" style={{width: 'auto'}} onClick={() => setCurrentView('create')}>
-            Nuevo Despliegue
+    <div style={{paddingTop: '2rem'}}>
+      <div className="nav-bar" style={{borderBottom: '1px solid var(--card-border)', paddingBottom: '2rem', marginBottom: '3rem'}}>
+        <div>
+          <h2 style={{margin: 0, fontSize: '2rem', fontWeight: 300, letterSpacing: '0.05em'}}>Panel de Orquestación</h2>
+          <p style={{margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Gestión de despliegues cognitivos activos</p>
+        </div>
+        <div style={{display: 'flex', gap: '2rem', alignItems: 'center'}}>
+          <button className="btn" style={{width: 'auto', padding: '0.75rem 2rem', border: 'none'}} onClick={() => setCurrentView('create')}>
+            + Nuevo Despliegue
           </button>
-          <span className="link" onClick={logout}>Finalizar Sesión</span>
+          <span className="link" onClick={logout} style={{fontSize: '0.8rem'}}>Finalizar Sesión</span>
         </div>
       </div>
 
       {loadingBots ? (
-        <p>Sincronizando estado...</p>
+        <div style={{textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)'}}>Sincronizando estado con el servidor...</div>
       ) : bots.length === 0 ? (
-        <div className="glass-card">
-          <p>Instancia vacía. No existen despliegues activos en este entorno.</p>
+        <div style={{textAlign: 'center', padding: '6rem 2rem', border: 'none', background: 'transparent'}}>
+          <p style={{marginBottom: '2rem', color: 'var(--text-secondary)'}}>Entorno vacío. No existen despliegues activos en este clúster.</p>
+          <button className="btn" style={{width: 'auto', border: 'none'}} onClick={() => setCurrentView('create')}>
+            Aprovisionar Primera Instancia
+          </button>
         </div>
       ) : (
-        <div className="grid">
+        <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
           {bots.map((bot, idx) => (
-            <div className="glass-card glass-card-interactive" key={idx}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-                <h3 style={{margin: 0}}>Clúster #{bot.deployment_id}</h3>
+            <div key={idx} style={{
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              padding: '1.5rem 0',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: idx !== bots.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+              transition: 'all 0.2s ease'
+            }} className="cluster-row">
+              
+              <div style={{display: 'flex', alignItems: 'center', gap: '3rem'}}>
+                <div>
+                  <span style={{fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)'}}>ID de Clúster</span>
+                  <h3 style={{margin: '0.2rem 0 0 0', fontSize: '1.2rem', fontWeight: 400}}>#{bot.deployment_id}</h3>
+                </div>
+                
+                <div style={{display: 'flex', gap: '2rem', paddingLeft: '2rem'}}>
+                  <div>
+                    <span style={{fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)'}}>Agente Admin</span>
+                    <p style={{margin: '0.2rem 0 0 0', fontSize: '0.9rem'}}>
+                      <a href={`https://t.me/${bot.admin_bot}`} target="_blank" rel="noopener noreferrer" style={{color: 'var(--text-primary)', textDecoration: 'none'}}>@{bot.admin_bot || 'admin_bot'}</a>
+                    </p>
+                  </div>
+                  <div>
+                    <span style={{fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-secondary)'}}>Agente RAG</span>
+                    <p style={{margin: '0.2rem 0 0 0', fontSize: '0.9rem'}}>
+                      <a href={`https://t.me/${bot.user_bot}`} target="_blank" rel="noopener noreferrer" style={{color: 'var(--text-primary)', textDecoration: 'none'}}>@{bot.user_bot || 'user_bot'}</a>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{display: 'flex', gap: '1.5rem', alignItems: 'center'}}>
                 <span style={{
-                  fontSize: '0.75rem',
+                  fontSize: '0.7rem',
                   textTransform: 'uppercase',
-                  letterSpacing: '1px'
-                }}>Operativo</span>
-              </div>
-              
-              <div className="bot-card-flex" style={{display: 'flex', gap: '1rem', marginBottom: '2rem'}}>
-                <div style={{flex: 1}}>
-                  <p style={{fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '1px'}}>Agente Admin</p>
-                  <p style={{fontWeight: '400', margin: 0, fontSize: '0.95rem'}}>
-                    <a href={`https://t.me/${bot.admin_bot}`} target="_blank" rel="noopener noreferrer" style={{color: 'var(--text-primary)', textDecoration: 'none'}}>
-                      @{bot.admin_bot || 'admin_bot'}
-                    </a>
-                  </p>
+                  letterSpacing: '1px',
+                  color: '#4ade80',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span style={{width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', display: 'inline-block'}}></span>
+                  Operativo
+                </span>
+                
+                <div style={{display: 'flex', gap: '1.5rem', alignItems: 'center'}}>
+                  <span 
+                    className="link" 
+                    style={{fontSize: '0.8rem'}}
+                    onClick={() => {
+                      setEditingBotId(bot.deployment_id)
+                      setEditConfig({ name: '', role: '', tone: 'Formal y profesional', strictness: 'strict' })
+                    }}
+                  >
+                    AJUSTAR IA
+                  </span>
+                  <span 
+                    className="link" 
+                    style={{fontSize: '0.8rem', color: '#ff4444'}}
+                    onClick={() => handleDeleteBot(bot.deployment_id)}
+                  >
+                    DESVINCULAR
+                  </span>
                 </div>
-                <div style={{flex: 1}}>
-                  <p style={{fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '1px'}}>Agente RAG</p>
-                  <p style={{fontWeight: '400', margin: 0, fontSize: '0.95rem'}}>
-                    <a href={`https://t.me/${bot.user_bot}`} target="_blank" rel="noopener noreferrer" style={{color: 'var(--text-primary)', textDecoration: 'none'}}>
-                      @{bot.user_bot || 'user_bot'}
-                    </a>
-                  </p>
-                </div>
               </div>
-              
-              <div className="bot-card-flex" style={{display: 'flex', gap: '1rem'}}>
-                <button 
-                  className="btn" 
-                  style={{flex: 2}}
-                  onClick={() => {
-                    setEditingBotId(bot.deployment_id)
-                    setEditConfig({ name: '', role: '', tone: 'Formal y profesional' })
-                  }}
-                >
-                  Configurar IA
-                </button>
-                <button 
-                  className="btn btn-outline" 
-                  style={{flex: 1}}
-                  onClick={() => handleDeleteBot(bot.deployment_id)}
-                >
-                  Desvincular
-                </button>
-              </div>
+
             </div>
           ))}
         </div>
@@ -374,8 +407,8 @@ function App() {
       {/* MODAL CONFIGURACION */}
       {editingBotId !== null && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <h2 style={{marginBottom: '0.5rem'}}>Ajustes Cognitivos</h2>
+          <div className="modal-content" style={{background: '#050505', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '3rem'}}>
+            <h2 style={{marginBottom: '0.5rem', fontWeight: 300}}>Ajustes Cognitivos</h2>
             <p style={{fontSize: '0.85rem', marginBottom: '2.5rem'}}>Clúster destino: #{editingBotId}. Sincronización remota requerida.</p>
             
             <form onSubmit={handleUpdatePrompt}>
@@ -398,6 +431,15 @@ function App() {
                 </select>
               </div>
               
+              <div className="input-group">
+                <label>Umbral de Alucinación (RAG)</label>
+                <select value={editConfig.strictness} onChange={e => setEditConfig({...editConfig, strictness: e.target.value})}>
+                  <option value="strict">Estricto (Cero Alucinaciones)</option>
+                  <option value="flexible">Flexible (Inferencia y Sugerencias)</option>
+                  <option value="creative">Creativo (Respuesta Abierta)</option>
+                </select>
+              </div>
+              
               <div style={{display: 'flex', gap: '1rem', marginTop: '3rem'}}>
                 <button type="button" className="btn btn-outline" onClick={() => setEditingBotId(null)}>Cancelar</button>
                 <button type="submit" className="btn" disabled={isUpdating}>
@@ -412,17 +454,20 @@ function App() {
   )
 
   const renderCreateBot = () => (
-    <div>
-      <div className="nav-bar">
-        <h2>Nuevo Despliegue</h2>
-        <span className="link" onClick={() => setCurrentView('dashboard')}>Cancelar</span>
+    <div style={{paddingTop: '2rem'}}>
+      <div className="nav-bar" style={{borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2rem', marginBottom: '3rem'}}>
+        <div>
+          <h2 style={{margin: 0, fontSize: '2rem', fontWeight: 300, letterSpacing: '0.05em'}}>Aprovisionar Nodo</h2>
+          <p style={{margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Configuración de entorno y agentes RAG</p>
+        </div>
+        <span className="link" onClick={() => setCurrentView('dashboard')}>Cancelar y Volver</span>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
+      <div className="grid" style={{ gridTemplateColumns: '1.5fr 1fr', gap: '4rem' }}>
         {/* Formulario de Configuración */}
-        <div className="glass-card">
-          <h4 style={{marginBottom: '2rem'}}>Aprovisionamiento de Nodos</h4>
-          <form onSubmit={handleCreateBot}>
+        <div style={{padding: '0'}}>
+          <h4 style={{marginBottom: '2rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', fontWeight: 500}}>Credenciales de Conexión</h4>
+          <form onSubmit={handleNextStep}>
             <div className="input-group">
               <label>API Token (Nodo Admin)</label>
               <input required type="text" placeholder="Formato: 123456:ABC-DEF" 
@@ -440,47 +485,24 @@ function App() {
               <input required type="password" placeholder="sk-..." 
                 value={formData.openai_api_key} onChange={e => setFormData({...formData, openai_api_key: e.target.value})} />
             </div>
-
-            <div style={{height: '1px', background: 'var(--card-border)', margin: '3rem 0'}}></div>
             
-            <h4 style={{marginBottom: '2rem'}}>Base Conductual</h4>
-
-            <div className="input-group">
-              <label>Identidad del Agente</label>
-              <input required type="text" placeholder="Ej: Consultor Tributario" 
-                value={botConfig.name} onChange={e => setBotConfig({...botConfig, name: e.target.value})} />
+            <div style={{marginTop: '3rem'}}>
+              <button type="submit" className="btn" style={{border: 'none', padding: '1rem 3rem', width: 'auto'}}>
+                Configurar Directivas IA →
+              </button>
             </div>
-
-            <div className="input-group">
-              <label>Misión Principal</label>
-              <input required type="text" placeholder="Ej: Analizar documentación fiscal" 
-                value={botConfig.role} onChange={e => setBotConfig({...botConfig, role: e.target.value})} />
-            </div>
-
-            <div className="input-group">
-              <label>Estilo de Comunicación</label>
-              <select value={botConfig.tone} onChange={e => setBotConfig({...botConfig, tone: e.target.value})}>
-                <option value="Formal y profesional">Formal y Profesional</option>
-                <option value="Técnico y riguroso">Técnico y Riguroso</option>
-                <option value="Cortés e informativo">Cortés e Informativo</option>
-              </select>
-            </div>
-            
-            <button type="submit" className="btn" disabled={isDeploying || deploySuccess} style={{marginTop: '3rem'}}>
-              {isDeploying ? 'Sincronizando Infraestructura...' : deploySuccess ? 'Despliegue Confirmado' : 'Ejecutar Despliegue'}
-            </button>
           </form>
         </div>
 
         {/* Panel de Pago Simulado */}
-        <div className="glass-card" style={{alignSelf: 'start', padding: '2rem'}}>
-          <h4 style={{marginBottom: '0.5rem'}}>Estimación de Costos</h4>
-          <p style={{fontSize: '0.9rem', marginBottom: '2rem', color: 'var(--text-secondary)'}}>Suscripción Corporativa - Licencia Unificada</p>
+        <div style={{alignSelf: 'start'}}>
+          <h4 style={{marginBottom: '0.5rem', fontWeight: 500}}>Estimación de Costos</h4>
+          <p style={{fontSize: '0.85rem', marginBottom: '2rem', color: 'var(--text-secondary)'}}>Suscripción Corporativa - Licencia Unificada</p>
           
-          <div style={{background: '#050505', border: '1px solid var(--card-border)', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem'}}>
-            <h4 style={{margin: 0, color: 'var(--text-primary)'}}>AIOPSORA B2B</h4>
+          <div style={{background: 'rgba(255,255,255,0.02)', padding: '1.5rem', borderRadius: '4px', marginBottom: '2rem'}}>
+            <h4 style={{margin: 0, color: 'var(--text-primary)', fontSize: '0.9rem'}}>AIOPSORA B2B</h4>
             <p style={{margin: '1.5rem 0', letterSpacing: '4px', fontSize: '1.1rem', color: 'var(--text-primary)'}}>**** **** **** 4242</p>
-            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)'}}>
               <span style={{textTransform: 'uppercase'}}>Autorizado</span>
               <span>12/28</span>
             </div>
@@ -495,7 +517,7 @@ function App() {
               <span>Soporte SLA y Conector Seguro</span>
               <span style={{color: 'var(--text-primary)'}}>Incluido</span>
             </div>
-            <div style={{height: '1px', background: 'var(--card-border)', margin: '1.5rem 0'}}></div>
+            <div style={{height: '1px', background: 'rgba(255,255,255,0.05)', margin: '1.5rem 0'}}></div>
             <div style={{display: 'flex', justifyContent: 'space-between', fontWeight: '400', fontSize: '1.1rem', color: 'var(--text-primary)'}}>
               <span>Total a facturar mensual</span>
               <span>$299.00 USD</span>
@@ -503,6 +525,55 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* MODAL DE DIRECTIVAS */}
+      {showDirectivesModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{background: '#050505', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '3rem'}}>
+            <h2 style={{marginBottom: '0.5rem', fontWeight: 300, fontSize: '1.8rem'}}>Directivas Conductuales</h2>
+            <p style={{fontSize: '0.85rem', marginBottom: '2.5rem', color: 'var(--text-secondary)'}}>Define la identidad y misión del motor cognitivo.</p>
+            
+            <form onSubmit={handleCreateBot}>
+              <div className="input-group">
+                <label>Identidad del Agente</label>
+                <input required type="text" placeholder="Ej: Consultor Tributario" 
+                  value={botConfig.name} onChange={e => setBotConfig({...botConfig, name: e.target.value})} />
+              </div>
+
+              <div className="input-group">
+                <label>Misión Principal</label>
+                <input required type="text" placeholder="Ej: Analizar documentación fiscal" 
+                  value={botConfig.role} onChange={e => setBotConfig({...botConfig, role: e.target.value})} />
+              </div>
+
+              <div className="input-group">
+                <label>Estilo de Comunicación</label>
+                <select value={botConfig.tone} onChange={e => setBotConfig({...botConfig, tone: e.target.value})}>
+                  <option value="Formal y profesional">Formal y Profesional</option>
+                  <option value="Técnico y riguroso">Técnico y Riguroso</option>
+                  <option value="Cortés e informativo">Cortés e Informativo</option>
+                </select>
+              </div>
+              
+              <div className="input-group">
+                <label>Umbral de Alucinación (RAG)</label>
+                <select value={botConfig.strictness} onChange={e => setBotConfig({...botConfig, strictness: e.target.value})}>
+                  <option value="strict">Estricto (Cero Alucinaciones)</option>
+                  <option value="flexible">Flexible (Inferencia y Sugerencias)</option>
+                  <option value="creative">Creativo (Respuesta Abierta)</option>
+                </select>
+              </div>
+              
+              <div style={{display: 'flex', gap: '1.5rem', marginTop: '3rem', alignItems: 'center'}}>
+                <span className="link" onClick={() => setShowDirectivesModal(false)} style={{fontSize: '0.85rem'}}>Cancelar y Volver</span>
+                <button type="submit" className="btn" disabled={isDeploying || deploySuccess} style={{border: 'none', padding: '0.75rem 2rem'}}>
+                  {isDeploying ? 'Desplegando...' : deploySuccess ? 'Aprovisionada ✓' : 'Confirmar y Desplegar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 
