@@ -17,6 +17,15 @@ class Deployment(SQLModel, table=True):
     openai_cred_id: str
     extra_prompt: str
 
+class ChatHistory(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    bot_id: str = Field(index=True)
+    chat_id: str = Field(index=True)
+    role: str
+    content: str
+    timestamp: str = Field(default_factory=lambda: __import__('datetime').datetime.utcnow().isoformat())
+
 # --- ESQUEMAS API (VALIDACIÓN) ---
 class DeployRequest(BaseModel):
     admin_token: str

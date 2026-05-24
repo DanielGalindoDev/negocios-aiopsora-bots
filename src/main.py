@@ -45,7 +45,8 @@ async def create_n8n_workflow(name: str, nodes: list, connections: dict, creds: 
             "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
             "@n8n/n8n-nodes-langchain.lmChatOpenAi",
             "@n8n/n8n-nodes-langchain.openAi",
-            "n8n-nodes-base.openAi"
+            "n8n-nodes-base.openAi",
+            "n8n-nodes-base.httpRequest"
         ]:
             node["credentials"] = {"openAiApi": creds["openai"]}
 
@@ -72,7 +73,8 @@ async def update_n8n_workflow(wf_id: str, name: str, nodes: list, connections: d
             "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
             "@n8n/n8n-nodes-langchain.lmChatOpenAi",
             "@n8n/n8n-nodes-langchain.openAi",
-            "n8n-nodes-base.openAi"
+            "n8n-nodes-base.openAi",
+            "n8n-nodes-base.httpRequest"
         ]:
             node["credentials"] = {"openAiApi": creds["openai"]}
 
@@ -146,7 +148,7 @@ async def create_deployment(req: DeployRequest, db: Session = Depends(get_sessio
         admin_n, admin_c = get_admin_workflow(bot_id=safe_bot_id)
         admin_wf_id = await create_n8n_workflow(f"Bot Admin: {admin_user} (Deploy #{deploy_id})", admin_n, admin_c, admin_creds)
 
-        user_n, user_c = get_user_workflow(extra_prompt=req.extra_prompt, bot_id=safe_bot_id, openai_api_key=req.openai_api_key)
+        user_n, user_c = get_user_workflow(extra_prompt=req.extra_prompt, bot_id=safe_bot_id)
         user_wf_id = await create_n8n_workflow(f"Bot User: {user_user} (Deploy #{deploy_id})", user_n, user_c, user_creds)
 
         # 4. Actualizar el registro con los IDs reales de N8N
@@ -191,14 +193,7 @@ async def update_deployment_prompt(deployment_id: int, req: UpdatePromptRequest,
 
     try:
         safe_bot_id = f"{deployment.admin_bot_username.replace('@', '').lower()}_{deployment.id}"
-        
-        # Necesitamos el API key crudo para inyectarlo en el workflow crudo
-        from sqlmodel import select
-        from src.models import BotCredential
-        openai_cred = db.exec(select(BotCredential).where(BotCredential.id == deployment.openai_cred_id)).first()
-        raw_openai_key = openai_cred.credentials if openai_cred else "sk-unknown"
-
-        user_n, user_c = get_user_workflow(extra_prompt=req.extra_prompt, bot_id=safe_bot_id, openai_api_key=raw_openai_key)
+        user_n, user_c = get_user_workflow(extra_prompt=req.extra_prompt, bot_id=safe_bot_id)
 
         # Restore the credential maps expected by N8N
         openai_cred_name = f"{deployment.admin_bot_username} - {deployment.id}"
