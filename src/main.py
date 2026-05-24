@@ -4,6 +4,7 @@ import httpx
 from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, create_engine
 
 # Import modular config, models, and workflows
@@ -98,6 +99,14 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="N8N Automation API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- DEPLOY ---
 @app.post("/deploy", response_model=DeployResponse)
