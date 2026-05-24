@@ -39,12 +39,13 @@ async def create_n8n_workflow(name: str, nodes: list, connections: dict, creds: 
         t = node["type"]
         if t in ["n8n-nodes-base.telegramTrigger", "n8n-nodes-base.telegram"]:
             node["credentials"] = {"telegramApi": creds["telegram"]}
-        elif t == "@n8n/n8n-nodes-langchain.vectorStorePGVector":
+        elif t in ["@n8n/n8n-nodes-langchain.vectorStorePGVector", "n8n-nodes-base.postgres"]:
             node["credentials"] = {"postgres": creds["postgres"]}
         elif t in [
             "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
             "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-            "@n8n/n8n-nodes-langchain.openAi"
+            "@n8n/n8n-nodes-langchain.openAi",
+            "n8n-nodes-base.openAi"
         ]:
             node["credentials"] = {"openAiApi": creds["openai"]}
 
@@ -65,12 +66,13 @@ async def update_n8n_workflow(wf_id: str, name: str, nodes: list, connections: d
         t = node["type"]
         if t in ["n8n-nodes-base.telegramTrigger", "n8n-nodes-base.telegram"]:
             node["credentials"] = {"telegramApi": creds["telegram"]}
-        elif t == "@n8n/n8n-nodes-langchain.vectorStorePGVector":
+        elif t in ["@n8n/n8n-nodes-langchain.vectorStorePGVector", "n8n-nodes-base.postgres"]:
             node["credentials"] = {"postgres": creds["postgres"]}
         elif t in [
             "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
             "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-            "@n8n/n8n-nodes-langchain.openAi"
+            "@n8n/n8n-nodes-langchain.openAi",
+            "n8n-nodes-base.openAi"
         ]:
             node["credentials"] = {"openAiApi": creds["openai"]}
 
@@ -101,43 +103,59 @@ async def create_deployment(req: DeployRequest, db: Session = Depends(get_sessio
     try:
         admin_user = await get_telegram_bot_info(req.admin_token)
         user_user  = await get_telegram_bot_info(req.user_token)
+        # 1. Crear registro en BD primero para obtener el ID de despliegue
+        new_deployment = Deployment(
+            admin_bot_token=req.admin_token, admin_bot_username=admin_user,
+            user_bot_token=req.user_token,   user_bot_username=user_user,
+            n8n_admin_cred_id="", n8n_user_cred_id="",
+            n8n_admin_workflow_id="", n8n_user_workflow_id="",
+            openai_cred_id="", extra_prompt=req.extra_prompt or ""
+        )
+        db.add(new_deployment)
+        db.commit()
+        db.refresh(new_deployment)
 
+        deploy_id = new_deployment.id
+
+        # 2. Crear credenciales (Postgres es global, las demás usan deploy_id)
         pg_cred_id = await get_or_create_credential("Global Postgres", "postgres", {
             "host": settings.POSTGRES_HOST, "database": settings.POSTGRES_DB, "user": settings.POSTGRES_USER,
             "password": settings.POSTGRES_PASSWORD, "port": 5432, "ssl": "disable", "sshTunnel": False
         })
 
-        openai_cred_id, openai_cred_name = await get_or_create_openai_credential(req.openai_api_key, admin_user)
+        openai_cred_id, openai_cred_name = await get_or_create_openai_credential(
+            req.openai_api_key, f"{admin_user} - {deploy_id}"
+        )
 
         admin_cred_id = await get_or_create_credential(
-            f"Admin Cred - {admin_user}", "telegramApi", {"accessToken": req.admin_token}
+            f"Admin Cred - {admin_user} - {deploy_id}", "telegramApi", {"accessToken": req.admin_token}
         )
         user_cred_id = await get_or_create_credential(
-            f"User Cred - {user_user}", "telegramApi", {"accessToken": req.user_token}
+            f"User Cred - {user_user} - {deploy_id}", "telegramApi", {"accessToken": req.user_token}
         )
 
         shared = {"postgres": {"id": pg_cred_id, "name": "Global Postgres"},
                   "openai":   {"id": openai_cred_id, "name": openai_cred_name}}
 
-        admin_creds = {**shared, "telegram": {"id": admin_cred_id, "name": f"Admin Cred - {admin_user}"}}
-        user_creds  = {**shared, "telegram": {"id": user_cred_id,  "name": f"User Cred - {user_user}"}}
+        admin_creds = {**shared, "telegram": {"id": admin_cred_id, "name": f"Admin Cred - {admin_user} - {deploy_id}"}}
+        user_creds  = {**shared, "telegram": {"id": user_cred_id,  "name": f"User Cred - {user_user} - {deploy_id}"}}
 
-        admin_n, admin_c = get_admin_workflow()
-        admin_wf_id = await create_n8n_workflow(f"Bot Admin: {admin_user}", admin_n, admin_c, admin_creds)
+        safe_bot_id = f"{admin_user.replace('@', '').lower()}_{deploy_id}"
+        
+        # 3. Crear flujos usando el deploy_id en los nombres y metadata
+        admin_n, admin_c = get_admin_workflow(bot_id=safe_bot_id)
+        admin_wf_id = await create_n8n_workflow(f"Bot Admin: {admin_user} (Deploy #{deploy_id})", admin_n, admin_c, admin_creds)
 
-        user_n, user_c = get_user_workflow(req.extra_prompt)
-        user_wf_id = await create_n8n_workflow(f"Bot User: {user_user}", user_n, user_c, user_creds)
+        user_n, user_c = get_user_workflow(extra_prompt=req.extra_prompt, bot_id=safe_bot_id, openai_api_key=req.openai_api_key)
+        user_wf_id = await create_n8n_workflow(f"Bot User: {user_user} (Deploy #{deploy_id})", user_n, user_c, user_creds)
 
-        new_deployment = Deployment(
-            admin_bot_token=req.admin_token, admin_bot_username=admin_user,
-            user_bot_token=req.user_token,   user_bot_username=user_user,
-            n8n_admin_cred_id=admin_cred_id, n8n_user_cred_id=user_cred_id,
-            n8n_admin_workflow_id=admin_wf_id, n8n_user_workflow_id=user_wf_id,
-            openai_cred_id=openai_cred_id, extra_prompt=req.extra_prompt or ""
-        )
-        db.add(new_deployment)
+        # 4. Actualizar el registro con los IDs reales de N8N
+        new_deployment.n8n_admin_cred_id = admin_cred_id
+        new_deployment.n8n_user_cred_id = user_cred_id
+        new_deployment.n8n_admin_workflow_id = admin_wf_id
+        new_deployment.n8n_user_workflow_id = user_wf_id
+        new_deployment.openai_cred_id = openai_cred_id
         db.commit()
-        db.refresh(new_deployment)
 
         return DeployResponse(
             message="Despliegue completado con éxito.",
@@ -152,6 +170,19 @@ async def create_deployment(req: DeployRequest, db: Session = Depends(get_sessio
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
+@app.get("/deploy")
+async def list_deployments(db: Session = Depends(get_session)):
+    from sqlmodel import select
+    deployments = db.exec(select(Deployment)).all()
+    return [
+        {
+            "deployment_id": d.id,
+            "admin_bot": d.admin_bot_username,
+            "user_bot": d.user_bot_username
+        }
+        for d in deployments
+    ]
+
 @app.put("/deploy/{deployment_id}/prompt")
 async def update_deployment_prompt(deployment_id: int, req: UpdatePromptRequest, db: Session = Depends(get_session)):
     deployment = db.get(Deployment, deployment_id)
@@ -159,10 +190,18 @@ async def update_deployment_prompt(deployment_id: int, req: UpdatePromptRequest,
         raise HTTPException(status_code=404, detail="Despliegue no encontrado")
 
     try:
-        user_n, user_c = get_user_workflow(req.extra_prompt)
+        safe_bot_id = f"{deployment.admin_bot_username.replace('@', '').lower()}_{deployment.id}"
+        
+        # Necesitamos el API key crudo para inyectarlo en el workflow crudo
+        from sqlmodel import select
+        from src.models import BotCredential
+        openai_cred = db.exec(select(BotCredential).where(BotCredential.id == deployment.openai_cred_id)).first()
+        raw_openai_key = openai_cred.credentials if openai_cred else "sk-unknown"
+
+        user_n, user_c = get_user_workflow(extra_prompt=req.extra_prompt, bot_id=safe_bot_id, openai_api_key=raw_openai_key)
 
         # Restore the credential maps expected by N8N
-        openai_cred_name = f"OpenAI Cred - {deployment.admin_bot_username}"
+        openai_cred_name = f"{deployment.admin_bot_username} - {deployment.id}"
         user_creds = {
             "telegram": {"id": deployment.n8n_user_cred_id, "name": f"User Cred - {deployment.user_bot_username}"},
             "postgres": {"id": "1", "name": "Global Postgres"}, # We just need the IDs to update node properly.
@@ -194,14 +233,28 @@ async def delete_deployment(deployment_id: int, db: Session = Depends(get_sessio
     if not deployment:
         raise HTTPException(status_code=404, detail="Despliegue no encontrado")
 
+    # 1. Eliminar de N8N
     await delete_n8n_entity("workflows",   deployment.n8n_admin_workflow_id)
     await delete_n8n_entity("workflows",   deployment.n8n_user_workflow_id)
     await delete_n8n_entity("credentials", deployment.n8n_admin_cred_id)
     await delete_n8n_entity("credentials", deployment.n8n_user_cred_id)
+    if deployment.openai_cred_id:
+        await delete_n8n_entity("credentials", deployment.openai_cred_id)
 
+    # 2. Eliminar la tabla de vectores dedicada en la base de datos documental (PGVector)
+    safe_bot_id = f"{deployment.admin_bot_username.replace('@', '').lower()}_{deployment.id}"
+    try:
+        from sqlalchemy import text
+        table_name = f"n8n_vectors_{safe_bot_id}"
+        db.execute(text(f'DROP TABLE IF EXISTS "{table_name}";'))
+    except Exception as e:
+        db.rollback() # Prevenir InFailedSqlTransaction
+        print(f"Aviso: No se pudo eliminar la tabla de vectores {table_name}. Detalle: {e}")
+
+    # 3. Eliminar el registro en la API (Deployment)
     db.delete(deployment)
     db.commit()
-    return {"message": f"Despliegue {deployment_id} eliminado."}
+    return {"message": f"Despliegue {deployment_id} y sus vectores han sido eliminados correctamente."}
 
 if __name__ == "__main__":
     import uvicorn

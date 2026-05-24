@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Tuple
 NodeList = List[Dict[str, Any]]
 ConnectionMap = Dict[str, Dict[str, Any]]
 
-def get_admin_workflow() -> Tuple[NodeList, ConnectionMap]:
+def get_admin_workflow(bot_id: str = "default") -> Tuple[NodeList, ConnectionMap]:
     """
     Flujo de INGESTA de documentos.
     El admin envía un archivo (imagen, pdf u otro) por Telegram.
@@ -468,6 +468,7 @@ def get_admin_workflow() -> Tuple[NodeList, ConnectionMap]:
         {
             "parameters": {
                 "mode": "insert",
+                "tableName": f"n8n_vectors_{bot_id}",
                 "options": {}
             },
             "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
@@ -489,7 +490,16 @@ def get_admin_workflow() -> Tuple[NodeList, ConnectionMap]:
             "parameters": {
                 "dataType": "binary",
                 "binaryMode": "specificField",
-                "options": {}
+                "options": {
+                    "metadata": {
+                        "metadataValues": [
+                            {
+                                "name": "bot_id",
+                                "value": f"{bot_id}"
+                            }
+                        ]
+                    }
+                }
             },
             "id": "34d64714-19eb-435c-9516-ff0c5919ed11",
             "name": "Default Data Loader1",
@@ -786,5 +796,11 @@ def get_admin_workflow() -> Tuple[NodeList, ConnectionMap]:
             ]
         }
     }
+
+    import uuid
+    for node in nodes:
+        node["id"] = str(uuid.uuid4())
+        if "webhookId" in node:
+            node["webhookId"] = str(uuid.uuid4())
 
     return nodes, connections

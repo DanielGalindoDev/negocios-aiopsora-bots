@@ -7,9 +7,6 @@ class Settings(BaseSettings):
     N8N_API_URL: str
     N8N_API_KEY: str
     
-    # OpenAI Configuration
-    OPENAI_API_KEY: str
-    
     # Database / PostgreSQL Configuration
     DATABASE_URL: str
     POSTGRES_USER: str = "postgres"

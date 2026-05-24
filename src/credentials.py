@@ -49,7 +49,7 @@ async def get_or_create_openai_credential(api_key: str, identifier: str) -> tupl
             "data": {
                 "apiKey": api_key,
                 "header": False,
-                "allowedHttpRequestDomains": "none"
+                "allowedHttpRequestDomains": "all"
             }
         }
         resp = await client.post(f"{settings.N8N_API_URL}/credentials", json=payload, headers=settings.n8n_headers)

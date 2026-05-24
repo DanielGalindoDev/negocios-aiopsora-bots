@@ -19,7 +19,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.n8n
-    platform: linux/amd64
     ports:
       - "5678:5678"
     environment:
@@ -32,6 +31,7 @@ services:
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-tu_clave_secreta_aqui}
       - WEBHOOK_URL=https://${NGROK_DOMAIN}
       - N8N_WEBHOOK_TUNNEL_URL=https://${NGROK_DOMAIN}
+      - N8N_PROXY_HOPS=1
       - NODE_FUNCTION_ALLOW_EXTERNAL=pdf-lib
     volumes:
       - n8n_storage:/home/node/.n8n
@@ -62,7 +62,6 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-n8n_db}
       - N8N_API_URL=http://n8n:5678/api/v1
       - N8N_API_KEY=${N8N_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
       - POSTGRES_DB=${POSTGRES_DB:-n8n_db}
