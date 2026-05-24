@@ -1,0 +1,11 @@
+FROM n8nio/n8n:latest
+
+# Cambiar a root temporalmente para instalar paquetes globales
+USER root
+
+# Instalar pdf-lib para el nodo de JavaScript
+RUN npm install -g pdf-lib
+RUN npm install -g pdf-parse@1.1.1
+
+# Volver al usuario node por seguridad
+USER node

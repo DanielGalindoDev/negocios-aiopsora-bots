@@ -1,0 +1,78 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-n8n_db}
+    volumes:
+      - db_storage:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile.n8n
+    platform: linux/amd64
+    ports:
+      - "5678:5678"
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-n8n_db}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-postgres}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-tu_clave_secreta_aqui}
+      - WEBHOOK_URL=https://${NGROK_DOMAIN}
+      - N8N_WEBHOOK_TUNNEL_URL=https://${NGROK_DOMAIN}
+      - NODE_FUNCTION_ALLOW_EXTERNAL=pdf-lib
+    volumes:
+      - n8n_storage:/home/node/.n8n
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command:
+      - "http"
+      - "n8n:5678"
+      - "--log=stdout"
+      - "--log-format=term"
+      - "--domain=${NGROK_DOMAIN}"
+    depends_on:
+      - n8n
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-n8n_db}
+      - N8N_API_URL=http://n8n:5678/api/v1
+      - N8N_API_KEY=${N8N_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-n8n_db}
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      db:
+        condition: service_healthy
+      n8n:
+        condition: service_started
+
+volumes:
+  db_storage:
+  n8n_storage:
