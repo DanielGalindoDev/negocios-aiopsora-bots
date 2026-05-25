@@ -25,17 +25,21 @@ def get_user_workflow(extra_prompt: str = "", bot_id: str = "default") -> Tuple[
     )
 
     hyde_prompt = (
-        "Eres un analista experto en bases de datos corporativas. El usuario hará una pregunta corta. "
-        "Tu trabajo NO es responderla, sino expandirla y enriquecerla con sinónimos, contexto técnico y palabras clave "
-        "para optimizar su búsqueda en una base de datos vectorial (Query Expansion / HyDE).\\n"
-        "Devuelve ÚNICAMENTE el párrafo expandido de búsqueda, sin saludos ni preámbulos."
+        "Tu única tarea es extraer y generar una lista de palabras clave muy relevantes basadas en la pregunta del usuario, "
+        "incluyendo sinónimos y conceptos corporativos relacionados.\\n"
+        "NO agregues conjunciones, preposiciones, artículos ni palabras vacías (como 'y', 'de', 'el', 'para', etc).\\n"
+        "Devuelve ÚNICAMENTE una lista de palabras clave puras separadas por espacios. "
+        "NO respondas a la pregunta, NO converses y NO des explicaciones."
     )
 
     if extra_prompt and extra_prompt.strip():
         # Scape quotes and newlines for JS
         safe_extra = extra_prompt.strip().replace('\\n', '\\\\n').replace('\"', '\\\"')
         base_system_message = f"=== INSTRUCCIONES DEL ADMINISTRADOR ===\\n{safe_extra}\\n\\n" + base_system_message
-        hyde_prompt = f"Ten en cuenta el siguiente contexto de la empresa para inyectar mejores palabras clave:\\n{safe_extra}\\n\\n" + hyde_prompt
+        
+        # Para HyDE, solo queremos el rol de la empresa, NO las restricciones estrictas de RAG
+        hyde_context = safe_extra.split("=== NIVEL DE RESTRICCIÓN")[0].strip()
+        hyde_prompt = f"Contexto de la empresa para inyectar mejores palabras clave:\\n{hyde_context}\\n\\n" + hyde_prompt
 
     nodes: NodeList = [
         {
@@ -92,7 +96,7 @@ def get_user_workflow(extra_prompt: str = "", bot_id: str = "default") -> Tuple[
                 },
                 "sendBody": True,
                 "specifyBody": "json",
-                "jsonBody": "={{ {\n  \"model\": \"text-embedding-ada-002\",\n  \"input\": $('HyDE Enrichment').item.json.choices[0].message.content\n} }}",
+                "jsonBody": "={{ {\n  \"model\": \"text-embedding-3-small\",\n  \"input\": $('HyDE Enrichment').item.json.choices[0].message.content\n} }}",
                 "options": {}
             },
             "type": "n8n-nodes-base.httpRequest",
