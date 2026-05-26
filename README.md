@@ -1,192 +1,191 @@
 # AIOPSORA Bots
 
-Plataforma empresarial de orquestación, despliegue y administración automatizada de Asistentes Inteligentes para Telegram con capacidades avanzadas de RAG (Retrieval-Augmented Generation), HyDE (Hypothetical Document Embeddings) e ingesta de documentos inteligente (OCR de imágenes y procesamiento de PDFs) integrada con n8n y FastAPI.
+An enterprise-grade orchestration, deployment, and automated management platform for Intelligent Telegram Assistants with advanced RAG (Retrieval-Augmented Generation), HyDE (Hypothetical Document Embeddings), and smart document ingestion (OCR for images and PDF processing) integrated with n8n and FastAPI.
 
 ---
 
-## Descripción del Proyecto
+## Project Description
 
-AIOPSORA Bots permite crear despliegues automatizados y dinámicos compuestos por una pareja de bots de Telegram (un Bot de Usuario/Consulta y un Bot de Administración/Ingesta) que interactúan directamente con una base de datos vectorial PostgreSQL (pgvector) y modelos de OpenAI. Toda la lógica de orquestación visual está gobernada dinámicamente por n8n, levantado y configurado automáticamente a través de la API central en FastAPI.
-
----
-
-## Características Principales
-
-### 1. Parejas de Bots por Despliegue
-Cada despliegue en la plataforma genera dos bots complementarios:
-*   **Bot de Consulta (User Bot):**
-    *   Diseñado para responder de forma interactiva y natural a los clientes o usuarios finales.
-    *   **HyDE (Hypothetical Document Embeddings):** Expande la consulta inicial del usuario utilizando un modelo de lenguaje para inyectar palabras clave técnicas adicionales.
-    *   **Búsqueda Semántica Vectorial:** Genera embeddings y consulta bases de datos vectoriales en PostgreSQL (pgvector) para recuperar el contexto más relevante.
-    *   **Memoria de Conversación:** Almacena e inyecta dinámicamente el historial de chat del usuario en cada interacción.
-    *   **Reglas y Prompts Dinámicos:** Admite prompts e instrucciones inyectados directamente por el administrador de forma ágil desde el backend.
-*   **Bot de Ingesta (Admin Bot):**
-    *   Diseñado para que los administradores alimenten de conocimientos al bot de usuario.
-    *   **Procesamiento OCR Visual (GPT-4o-mini):** Si se envía una imagen, el bot analiza visualmente su contenido y extrae información formal de forma profesional.
-    *   **Extracción de PDF:** Extrae texto automáticamente de documentos en formato PDF mediante pdf-lib y pdf-parse.
-    *   **Indexación en Base de Datos de Vectores:** Divide el texto en fragmentos solapados mediante separadores recursivos de caracteres, genera los embeddings con text-embedding-3-small de OpenAI y los indexa automáticamente en tablas vectoriales dedicadas por despliegue (n8n_vectors_<safe_bot_id>).
-
-### 2. API Central en FastAPI
-Una interfaz backend sumamente robusta construida con FastAPI y SQLModel para realizar operaciones completas del ciclo de vida de los bots:
-*   **Despliegue (POST /deploy):** Registra credenciales en n8n, inicializa e inicia flujos específicos de telegram, y aprovisiona base de datos vectoriales dedicadas para la pareja de bots.
-*   **Listado (GET /deploy):** Permite listar y monitorear todos los despliegues activos en la plataforma.
-*   **Modificación (PUT /deploy/{id}/prompt):** Actualiza el comportamiento e instrucciones en tiempo real del Bot de Consulta.
-*   **Limpieza Absoluta (DELETE /deploy/{id}):** Apaga los flujos en n8n, elimina credenciales de Telegram y OpenAI de la instancia, y destruye la tabla vectorial física de la base de datos para no dejar rastros de datos huérfanos.
-
-### 3. Infraestructura Containerizada Avanzada
-El entorno está completamente orquestado mediante Docker Compose:
-*   **db:** PostgreSQL 16 provisto con la extensión pgvector para el almacenamiento de embeddings multidimensionales.
-*   **n8n:** Contenedor n8n personalizado (Dockerfile.n8n) con paquetería npm global preinstalada para procesamiento dinámico de documentos (pdf-lib, pdf-parse).
-*   **ngrok:** Servicio de túnel seguro para exponer la instancia local de n8n a internet de manera que reciba eventos de webhook de Telegram al instante.
-*   **backend:** El servidor web FastAPI que expone la API de orquestación y gestiona el flujo de trabajo de la base de datos documental.
+AIOPSORA Bots enables the creation of automated, dynamic deployments composed of a pair of Telegram bots (a User Query Bot and an Administration Ingestion Bot) that directly interact with a PostgreSQL vector database (pgvector) and OpenAI models. All visual orchestration logic is dynamically governed by n8n, provisioned and configured automatically via the central FastAPI API.
 
 ---
 
-## Tecnologías Utilizadas
+## Key Features
+
+### 1. Bot Pairs per Deployment
+Each deployment on the platform generates two complementary bots:
+*   **User Query Bot (User Bot):**
+    *   Designed to interactively and naturally answer queries from clients or end users.
+    *   **HyDE (Hypothetical Document Embeddings):** Expands the user's initial query using a language model to inject additional technical keywords.
+    *   **Vector Semantic Search:** Generates embeddings and queries PostgreSQL (pgvector) vector databases to retrieve the most relevant context.
+    *   **Conversation Memory:** Automatically stores and dynamically injects the user's chat history into every interaction.
+    *   **Dynamic Rules and Prompts:** Supports custom instructions and prompts injected directly by the administrator in real-time from the backend.
+*   **Administration Ingestion Bot (Admin Bot):**
+    *   Designed for administrators to feed knowledge to the user bot.
+    *   **OCR Visual Processing (GPT-4o-mini):** If an image is sent, the bot visually analyzes its content and formally extracts structured information.
+    *   **PDF Extraction:** Automatically extracts text from PDF documents using pdf-lib and pdf-parse.
+    *   **Vector Database Indexing:** Splits text into overlapping chunks using recursive character splitters, generates embeddings with OpenAI's text-embedding-3-small, and indexes them automatically in dedicated vector tables per deployment (n8n_vectors_<safe_bot_id>).
+
+### 2. Central FastAPI API
+A robust backend interface built with FastAPI and SQLModel to handle the full lifecycle of the bots:
+*   **Deployment (POST /deploy):** Registers credentials in n8n, initializes and activates specific Telegram workflows, and provisions dedicated vector databases.
+*   **List (GET /deploy):** Lists and monitors all active deployments.
+*   **Update (PUT /deploy/{id}/prompt):** Updates the custom instructions and behavior of the Query Bot in real-time.
+*   **Absolute Cleanup (DELETE /deploy/{id}):** Deactivates workflows in n8n, deletes Telegram and OpenAI credentials from the instance, and physically drops the vector tables to ensure zero data waste.
+
+### 3. Advanced Containerized Infrastructure
+The environment is fully orchestrated using Docker Compose:
+*   **db:** PostgreSQL 16 equipped with the pgvector extension for multidimensional embedding storage.
+*   **n8n:** A customized n8n container (Dockerfile.n8n) with global npm packages pre-installed for dynamic document processing (pdf-lib, pdf-parse).
+*   **ngrok:** A secure tunneling service to expose the local n8n instance to the internet for instantaneous webhook delivery from Telegram.
+*   **backend:** The FastAPI web server exposing the orchestration API and managing the document database workflow.
+
+---
+
+## Technologies Used
 
 *   **Core Backend:** Python 3.12, FastAPI, SQLModel, Uvicorn, PostgreSQL, pgvector, SQLAlchemy.
-*   **Orquestador Visual:** n8n (flujos construidos mediante código Python dinámico).
-*   **Modelos de IA:** OpenAI API (gpt-4o-mini y text-embedding-3-small).
+*   **Visual Orchestrator:** n8n (workflows built via dynamic Python code).
+*   **AI Models:** OpenAI API (gpt-4o-mini and text-embedding-3-small).
 *   **Frontend:** React, Vite, TailwindCSS.
-*   **Infraestructura:** Docker & Docker Compose, Ngrok.
+*   **Infrastructure:** Docker & Docker Compose, Ngrok.
 
 ---
 
-## Estructura del Directorio
+## Directory Structure
 
 ```bash
 negocios-aiopsora-bots/
-├── src/                        # Lógica Backend (FastAPI)
-│   ├── admin_workflow.py       # Estructura del flujo del Bot de Ingesta para n8n
-│   ├── user_workflow.py        # Estructura del flujo del Bot de Consulta para n8n
-│   ├── config.py               # Singleton de configuración con Pydantic Settings
-│   ├── credentials.py          # Gestión y registro de credenciales de Telegram/OpenAI en n8n
-│   ├── models.py               # Modelos SQLModel (BD) y esquemas Pydantic (Validaciones)
-│   └── main.py                 # Endpoints de la API y Lifespan del servidor
-├── frontend/                   # Aplicación Web Frontend (React + Vite)
-├── Dockerfile                  # Dockerfile para compilar e iniciar el Backend FastAPI
-├── Dockerfile.n8n              # Dockerfile personalizado para n8n (con pdf-lib y pdf-parse)
-├── docker-compose.yaml         # Orquestación de servicios en contenedores locales
-├── pyproject.toml              # Definición de dependencias del proyecto de Python (con uv)
-├── uv.lock                     # Lockfile para dependencias deterministas de Python
-└── README.md                   # Documentación principal del sistema
+├── src/                        # Backend Logic (FastAPI)
+│   ├── admin_workflow.py       # Admin Ingestion Bot workflow structure for n8n
+│   ├── user_workflow.py        # User Query Bot workflow structure for n8n
+│   ├── config.py               # Configuration singleton with Pydantic Settings
+│   ├── credentials.py          # n8n credential registry manager for Telegram/OpenAI
+│   ├── models.py               # SQLModel Database Models & Pydantic Validation Schemas
+│   └── main.py                 # API endpoints & application lifespan
+├── frontend/                   # Frontend Web Application (React + Vite)
+├── Dockerfile                  # Dockerfile to compile and run the FastAPI Backend
+├── Dockerfile.n8n              # Custom Dockerfile for n8n (with pdf-lib and pdf-parse)
+├── docker-compose.yaml         # Containerized services orchestration
+├── pyproject.toml              # Python project dependency definition (using uv)
+├── uv.lock                     # Lockfile for deterministic Python dependencies
+└── README.md                   # Main system documentation
 ```
 
 ---
 
-## Guía de Inicio Rápido
+## Quick Start Guide
 
-### 1. Requisitos Previos
-Asegúrate de contar con lo siguiente en tu máquina:
-*   Docker y Docker Compose instalados.
-*   Una cuenta activa de OpenAI y un API Key válido.
-*   Dos tokens de bot de Telegram creados mediante @BotFather (uno para uso del administrador y otro para uso del cliente).
-*   Una cuenta de Ngrok y un authtoken para la tunelización.
+### 1. Prerequisites
+Ensure your development environment meets the following requirements:
+*   Docker and Docker Compose installed.
+*   An active OpenAI account and a valid API Key.
+*   Two Telegram bot tokens created via @BotFather (one for admin ingestion, one for user queries).
+*   A Ngrok account and authtoken for webhook tunneling.
 
-### 2. Configurar Variables de Entorno
-Crea un archivo `.env` en el directorio raíz del proyecto con la siguiente estructura:
+### 2. Configure Environment Variables
+Create a `.env` file in the root directory of the project with the following structure:
 
 ```env
-# Configuración de N8N
+# N8N Configuration
 N8N_API_URL=http://n8n:5678/api/v1
-N8N_API_KEY=tu_n8n_api_key_aqui
+N8N_API_KEY=your_n8n_api_key_here
 
-# Configuración de Base de Datos (PostgreSQL)
+# Database Configuration (PostgreSQL)
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=mi_clave_segura_aqui
+POSTGRES_PASSWORD=your_secure_password_here
 POSTGRES_DB=n8n_db
-DATABASE_URL=postgresql://postgres:mi_clave_segura_aqui@db:5432/n8n_db
+DATABASE_URL=postgresql://postgres:your_secure_password_here@db:5432/n8n_db
 
-# Configuración de Ngrok (Webhook Telegram Tunneling)
-NGROK_AUTHTOKEN=tu_authtoken_de_ngrok
-NGROK_DOMAIN=tu_subdominio_estatico_de_ngrok.ngrok-free.app
+# Ngrok Configuration (Webhook Telegram Tunneling)
+NGROK_AUTHTOKEN=your_ngrok_authtoken
+NGROK_DOMAIN=your_static_ngrok_subdomain.ngrok-free.app
 
-# Clave de encriptación interna de n8n
-N8N_ENCRYPTION_KEY=clave_secreta_altamente_segura
+# N8N Internal Encryption Key
+N8N_ENCRYPTION_KEY=highly_secure_encryption_key
 ```
 
-### 3. Levantar la Infraestructura
-Inicia todos los contenedores en segundo plano mediante Compose:
+### 3. Spin Up the Infrastructure
+Start all services in background mode using Compose:
 
 ```bash
 docker-compose up -d --build
 ```
 
-Esto levantará los siguientes servicios:
-1.  **db:** PostgreSQL escuchando en el puerto 5432.
-2.  **n8n:** Accesible localmente en http://localhost:5678.
-3.  **ngrok:** Genera un webhook túnel seguro a la URL configurada en NGROK_DOMAIN.
-4.  **backend:** API en FastAPI escuchando en http://localhost:8000.
+This will spin up the following services:
+1.  **db:** PostgreSQL listening on port 5432.
+2.  **n8n:** Accessible locally at http://localhost:5678.
+3.  **ngrok:** Secure webhook tunnel created using NGROK_DOMAIN.
+4.  **backend:** FastAPI API listening at http://localhost:8000.
 
 ---
 
-## Referencia de Endpoints API
+## API Endpoints Reference
 
-### Desplegar una Pareja de Bots
+### Deploy a Bot Pair
 *   **Endpoint:** `POST /deploy`
 *   **Body:**
     ```json
     {
-      "admin_token": "TOKEN_TELEGRAM_BOT_ADMIN",
-      "user_token": "TOKEN_TELEGRAM_BOT_USER",
+      "admin_token": "TELEGRAM_ADMIN_BOT_TOKEN",
+      "user_token": "TELEGRAM_USER_BOT_TOKEN",
       "openai_api_key": "SK-OPENAI-API-KEY",
-      "extra_prompt": "Instrucciones de comportamiento adicionales para el bot de usuario"
+      "extra_prompt": "Optional behavior guidelines for the User Bot"
     }
     ```
-*   **Respuesta:** Retorna el enlace directo a los bots en Telegram y el deployment_id generado.
+*   **Response:** Returns direct links to the created Telegram bots and the generated deployment_id.
 
-### Listar Despliegues Activos
+### List Active Deployments
 *   **Endpoint:** `GET /deploy`
-*   **Respuesta:** Una lista de todos los despliegues que contiene su identificador único y los nombres de usuario de los bots de Telegram.
+*   **Response:** A list of all active deployments containing their unique ID and bot usernames.
 
-### Actualizar Prompt de un Despliegue
+### Update Prompt of a Deployment
 *   **Endpoint:** `PUT /deploy/{deployment_id}/prompt`
 *   **Body:**
     ```json
     {
-      "extra_prompt": "Nueva directriz de comportamiento para responder con un estilo diferente."
+      "extra_prompt": "New behavioral guidelines for the User Bot."
     }
     ```
 
-### Eliminar un Despliegue
+### Delete a Deployment
 *   **Endpoint:** `DELETE /deploy/{deployment_id}`
-*   **Respuesta:** Elimina completamente los recursos de n8n, borra las credenciales vinculadas y destruye la tabla vectorial correspondiente.
+*   **Response:** Cleanly deletes n8n resources, drops active credentials, and physically drops the vector tables.
 
 ---
 
-## Arquitectura Conceptual
+## Conceptual Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Telegram_Interface [Telegram]
-        A[Administrador] -->|Sube PDF o Imagen| B(Bot Admin)
-        C[Cliente/Usuario] -->|Realiza pregunta| D(Bot User)
+    subgraph Telegram_Interface [Telegram Interface]
+        A[Administrator] -->|Uploads PDF or Image| B(Admin Bot)
+        C[Client/User] -->|Asks Question| D(User Bot)
     end
 
-    subgraph n8n_Workflows [Orquestación en n8n]
-        B -->|Webhook| E{Tipo de Archivo}
+    subgraph n8n_Workflows [n8n Orchestrated Workflows]
+        B -->|Webhook| E{File Type}
         E -->|PDF| F[Extract Text]
-        E -->|Imagen| G[GPT-4o-mini OCR]
+        E -->|Image| G[GPT-4o-mini OCR]
         F & G --> H[Split Text + Embeddings]
-        H -->|Guarda Vectores| I[(pgvector PostgreSQL)]
+        H -->|Save Vectors| I[(pgvector PostgreSQL)]
 
         D -->|Webhook| J[HyDE Expansion]
-        J --> K[Generar Embeddings]
+        J --> K[Generate Embeddings]
         K -->|Query Cosine| I
-        I -->|Contexto RAG| L[Generar Respuesta LLM]
-        L -->|Respuesta Final| D
+        I -->|RAG Context| L[Generate LLM Response]
+        L -->|Final Response| D
     end
 
-    subgraph FastAPI_Backend [API de Control]
-        M[Frontend React] -->|Administra Despliegues| N[FastAPI Server]
-        N -->|Registra workflows / credenciales| n8n_Workflows
-        N -->|Aprovisiona Tablas| I
+    subgraph FastAPI_Backend [FastAPI Control Backend]
+        M[React Frontend] -->|Manage Deployments| N[FastAPI Server]
+        N -->|Register Workflows / Credentials| n8n_Workflows
+        N -->|Provision Tables| I
     end
 ```
 
 ---
 
-## Licencia
+## License
 
-Este desarrollo es de propiedad privada y confidencial. Su uso y distribución están estrictamente regulados. Para más detalles, consulte el archivo [LICENSE](file:///Users/danielgalindo/projects/UNI/negocios-aiopsora-bots/LICENSE).
-
+This software is proprietary and confidential. Its use and distribution are strictly regulated. For more details, refer to the [LICENSE](file:///Users/danielgalindo/projects/UNI/negocios-aiopsora-bots/LICENSE) file.
